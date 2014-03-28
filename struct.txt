@@ -1,0 +1,10 @@
+配置文件
+1.name
+2.Addr
+
+数据结构表项
+表name
+1.address
+2.file_name
+3.file_down_count
+4.file_sha1
