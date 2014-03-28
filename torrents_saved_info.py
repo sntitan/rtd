@@ -7,9 +7,18 @@ def create_table(conn, name):
     create_sql += " (addr text, fname text, down_count int, fsha1 text)"
     sor.execute(create_sql)
 
+def find_torrent_by_name(conn, addr):
+    sor = conn.cursor()
+
+
+
+
+
+
+
+
+
 #unit test
 conn = sqlite3.connect("temp.db")
-
 create_table(conn,"ttg")
-
 conn.close()
