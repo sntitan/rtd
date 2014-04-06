@@ -11,3 +11,4 @@
 2.file_name
 3.file_down_count
 4.file_sha1
+5.add_time
