@@ -173,8 +173,10 @@ def download_all_torrents(db, host_name, rss_addr, down_dir):
 
 #1.Analyse argus
 arg_num = len(sys.argv)
-for i in range(1,arg_num):
-    out_debug(sys.argv[i])
+if arg_num == 1:
+    out_debug('Set the first argument as the config-path')
+    config_file_name = os.path.join(sys.argv[1],'tord.ini')
+    db_file_name = os.path.join(sys.argv[1],'tord.db')
 
 #2.Read in config file and init db
 cfg = ConfigParser.SafeConfigParser()
