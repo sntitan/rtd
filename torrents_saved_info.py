@@ -3,6 +3,11 @@ import sys
 import sqlite3
 import time
 import ConfigParser
+import feedparser
+import urllib2
+import hashlib
+import os
+import shutil
 
 ###config
 config_file_name='tord.ini'
@@ -31,14 +36,26 @@ def is_table_exists(sor, name):
     return False
 
 def find_torrent_by_addr(conn, name, addr):
+    if not is_table_exists(conn, name):
+        return []
     sor = conn.cursor()
     find_sql = "SELECT * FROM "+name+" WHERE addr='"+addr+"'"
     sor.execute(find_sql)
     return sor.fetchall()
 
 def find_torrent_by_name(conn, host_name, torrent_name):
+    if not is_table_exists(conn, host_name):
+        return []
     sor = conn.cursor()
-    find_sql = "SELECT * FROM "+name+" WHERE namer='"+name+"'"
+    find_sql = "SELECT * FROM "+host_name+" WHERE fname='"+torrent_name+"'"
+    sor.execute(find_sql)
+    return sor.fetchall()
+
+def find_torrent_by_hash(conn, host_name, torrent_hash):
+    if not is_table_exists(conn, host_name):
+        return []
+    sor = conn.cursor()
+    find_sql = "SELECT * FROM "+host_name+" WHERE fsha1='"+torrent_hash+"'"
     sor.execute(find_sql)
     return sor.fetchall()
 
@@ -46,24 +63,6 @@ def insert_torrent(conn, name, info):
     sor=conn.cursor()
     insert_sql="INSERT INTO "+name+" VALUES (?,?,?,?,?)"
     sor.execute(insert_sql,info)
-
-
-#unit test
-#conn = sqlite3.connect("tmp.db")
-###INIT
-#create_table(conn,"ttg")
-#insert_torrent(conn,'ttg',['http://ttg.im/test1','mame.test1',1,time.strftime('%Y-%m-%d %X', time.localtime()),'sha1 test1'])
-#insert_torrent(conn,'ttg',['http://ttg.im/test2','mame.test2',1,time.strftime('%Y-%m-%d %X', time.localtime()),'sha1 test2'])
-#insert_torrent(conn,'ttg',['http://ttg.im/test3','mame.test3',1,time.strftime('%Y-%m-%d %X', time.localtime()),'sha1 test3'])
-#insert_torrent(conn,'ttg',['http://ttg.im/test4','mame.test4',1,time.strftime('%Y-%m-%d %X', time.localtime()),'sha1 test4'])
-#create_table(conn,"chd")
-
-#sor = conn.cursor()
-#print is_table_exists(sor,'ttg')
-#print is_table_exists(sor,'chd')
-#print is_table_exists(sor,'ttg1')
-#conn.close()
-
 
 
 #config file adapt
@@ -96,11 +95,69 @@ def get_down_dirs(cfg):
 
 
 #torrents analyser
-def download_torrent(addr, save_dir):
+def calc_sha1(filepath):
+    with open(filepath,'rb') as f:
+        sha1obj = hashlib.sha1()
+        sha1obj.update(f.read())
+        hash = sha1obj.hexdigest()
+        return hash
+
+def download_torrent(url, save_path):
+    try:
+        urllib.urlretrieve(url,save_path)
+    except:
+        out_err("Download torrent err, addr %s" % url)
+        return None
+    with open(save_path, 'r') as pf:
+        return hashlib.sha256(f.read()).hexdigest()
+    return None
+
+    pf = open(down_full_path,'r')
+    pbuff = pf.read()
+    name = GetNameByDecodeFile(prefix,pbuff)
+    if name == None:
+        out_err("Invalid addr maybe")
+        return
+    with open(name,"wb") as file:
+        file.write(feed)
     return 'sha1'
 
-def download_all_torrents(rss_addr, down_dir):
+def download_torrents_list(db, host_name, addr_list, down_dir):
+    for addr_info in addr_list:
+        if not addr_info.has_key('href'):
+            continue
+        addr = addr_info['href']
+        if len(find_torrent_by_addr(db, host_name, addr) != 0):
+            continue
+        tmp_torrent_path = os.path.join(down_dir[1],'torrent.tmp')
+        if os.path.isfile(tmp_torrent_path):
+            os.remove(tmp_torrent_path)
+        tsha = download_torrent(addr,tmp_torrent_path)
+        if (tsha == None):
+            out_err('Download from addr %s fail'%addr)
+            continue
+        with open(tmp_torrent_path,'r') as f:
+            tor_name = GetNameByDecodeFile(host_name, f.read())
+        if tor_name == None:
+            out_err("Invalid file format")
+            continue
+        if len(find_torrent_by_hash(db, host_name, tsha)) != 0:
+            out_info('Download file %s but the same hash'%tor_name)
+        else:
+            out_info('Download file %s from addr %s'%(tor_name,addr))
+            tor_path = os.path.join(down_dir[0],tor_name)
+            shutil.move(tmp_torrent_path,tor_path)
+            os.remove(tmp_torrent_path)
+        insert_torrent(db, host_name,[(addr,tor_name,1,time.strftime('%Y-%m-%d %X', time.localtime()),tsha)])
     return
+
+def download_all_torrents(db, host_name, rss_addr, down_dir):
+    hd = feedparser.parse(rss_addr)
+    for feed in hd.entries:
+        if len(feed.enclosures != 0):
+            download_torrents_list(db, host_name, feed.enclosures, down_dir)
+        else:
+            download_torrents_list(db, host_name, feed.links, down_dir)
 
 #1.Analyse argus
 arg_num = len(sys.argv)
@@ -135,7 +192,7 @@ for secname in cfg.sections():
     out_info("Init table %s"%secname)
     create_table(tdb, secname)
 
-#5.download torrents one by one
+#5.download torrents site by site
 for secname in cfg.sections():
     sec_items = cfg.items(secname)
     for item in sec_items:
@@ -145,6 +202,6 @@ for secname in cfg.sections():
             out_error("Addr is empty in section %s"%secname)
             continue
         out_debug("Begin to download all torrents in section %s, addr '%s'"%(secname, item[1]))
-        download_all_torrents(item[1], tdir)
+        download_all_torrents(tdb, secname, item[1], tdir)
 
 tdb.close()
