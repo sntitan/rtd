@@ -177,6 +177,9 @@ if arg_num == 1:
     out_debug('Set the first argument as the config-path')
     config_file_name = os.path.join(sys.argv[1],'tord.ini')
     db_file_name = os.path.join(sys.argv[1],'tord.db')
+elif arg_num > 1:
+    print('%s [%s]'%(sys.argv[0], sys.argv[1]))
+    exit(0)
 
 #2.Read in config file and init db
 cfg = ConfigParser.SafeConfigParser()
