@@ -173,11 +173,17 @@ def download_all_torrents(db, host_name, rss_addr, down_dir):
 
 #1.Analyse argus
 arg_num = len(sys.argv)
-if arg_num == 1:
+if arg_num == 2:
+    if not os.path.exists(sys.argv[1]):
+        print('Path %s is not exists'%sys.argv[1])
+        exit(0)
     out_debug('Set the first argument as the config-path')
     config_file_name = os.path.join(sys.argv[1],'tord.ini')
+    if not os.path.isfile(config_file_name):
+        print('Cannot find config file %s'%config_file_name)
+        exit(0)
     db_file_name = os.path.join(sys.argv[1],'tord.db')
-elif arg_num > 1:
+elif arg_num > 2:
     print('%s [%s]'%(sys.argv[0], sys.argv[1]))
     exit(0)
 
