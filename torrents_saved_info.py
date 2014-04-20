@@ -38,6 +38,11 @@ def is_table_exists(sor, name):
             return True
     return False
 
+def get_table_list(conn):
+    sor = conn.cursor()
+    sor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    return sor.fetchall()
+
 def find_torrent_by_addr(conn, name, addr):
     if not is_table_exists(conn, name):
         return []
@@ -61,6 +66,16 @@ def find_torrent_by_hash(conn, host_name, torrent_hash):
     find_sql = "SELECT * FROM "+host_name+" WHERE fsha1='"+torrent_hash+"'"
     sor.execute(find_sql)
     return sor.fetchall()
+
+def find_torrent_by_hash_all(conn, torrent_hash):
+    tbs = get_table_list(conn)
+    for tb in tbs:
+        if(len(tb) == 0):
+            continue
+        tmp = find_torrent_by_hash(conn,tb[0],torrent_hash)
+        if len(tmp) != 0:
+            return tmp
+    return []
 
 def insert_torrent(conn, name, info):
     sor=conn.cursor()
@@ -154,7 +169,7 @@ def download_torrents_list(db, host_name, addr_list, down_dir):
         if tor_name == None:
             out_error("Invalid file format")
             continue
-        if len(find_torrent_by_hash(db, host_name, tsha)) != 0:
+        if len(find_torrent_by_hash_all(db, tsha)) != 0:
             out_info('Download file %s but the same hash'%tor_name.decode('utf-8'))
         else:
             out_info('Download file %s from addr %s'%(tor_name.decode('utf-8'),addr))
