@@ -12,9 +12,6 @@ class rss_web(object):
         else:
             self.temp_download_dir = ddir
 
-    def get_all_addrs(self):
-        pass
-
 class rss_conf(object):
     def read_in_value(self, web_name, key):
         if not self.conp.has_option(web_name, key):
