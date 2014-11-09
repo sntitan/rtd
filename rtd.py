@@ -6,14 +6,6 @@ from rtd_db import *
 def log_out(msg):
     pass
 
-class torrent(object):
-    def __init__(self, address):
-        self.address = address
-        self.file_name = None
-        self.file_down_count = 0
-        self.file_sha1 = None
-        self.add_time = None
-
 def download_torrent(addr, path):
     pass
 
