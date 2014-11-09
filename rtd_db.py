@@ -19,6 +19,7 @@ class torrent(object):
 class rss_db(object):
     def open(self, db_name):
         self.db = sqlite3.connect(db_name)
+        self.db.text_factory = str
     def close(self):
         self.db.close()
     def __init__(self, db_name):
@@ -154,6 +155,16 @@ if __name__ == '__main__':
     ccnt+=1
     assert rd.is_addr_exist('address_torrent3') == False
     assert rd.is_sha_exist('abcdadfasdfsadfasfasdf') == False
+
+    #case5
+    from rtd import get_name_by_tfile
+    ccnt+=1
+    t3 = torrent('address_torrent3')
+    with open('down/temp/torrent.tmp', 'rb') as pf:
+        t3.file_name = get_name_by_tfile(pf.read())
+    t3.file_down_count = 1
+    t3.file_sha1 = 'abcdefgt3'
+    rd.add_tor('SN2', t3)
 
     print 'All test finished, total num %u' % ccnt
     rd.close()

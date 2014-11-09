@@ -7,20 +7,20 @@ import hashlib
 import feedparser
 import urllib
 from bencode import bdecode
+import logging
 
 g_tmp_tname = 'torrent.tmp'
+g_logname = 'rtd.log'
 
 def log_out(msg):
-    print msg
+    logging.info(msg)
 def debug_out(msg):
-    #print '[DEBUG]',msg
-    pass
+    logging.debug(msg)
 
 def get_name_by_tfile(feedbuff):
     try:
         tor = bdecode(feedbuff)
     except:
-        print("Invalid feed file.")
         return None
     if not tor.has_key('info'):
         return None
@@ -46,6 +46,7 @@ def download_torrent(addr, path):
         tor.file_sha1 = hashlib.sha256(buf).hexdigest()
         tor.file_name = get_name_by_tfile(buf)
     if not tor.file_name:
+        log_out('Invalid log file, addr %s'%addr)
         return None
     return tor
 
@@ -78,48 +79,51 @@ def get_all_addrs(web_addr):
             down_links.append(addr_info['href'])
     return down_links
 
-g_name = 'rtd.ini'#stub
-g_dryrun = False
-rconf = rss_conf(g_name)
-rdb = rss_db(rconf.dbname)
-
-#0. init db
-debug_out('Init db...')
-for web in rconf.webs:
-    if rdb.is_table_exist(web.name):
-        continue
-    rdb.create_table(web.name)
-
-#1. download the torrents which failed to downloaded last time
-download_torrents_failed_last(rdb)
-
-#2. read in rss and download torrents
-for rweb in rconf.webs:
-    debug_out('Get torrents info from %s'%rweb.address)
-    addrs = get_all_addrs(rweb.address)
-    for tor_addr in addrs:
-        if rdb.is_addr_exist(tor_addr, rweb.name):
-            debug_out('Torrent address %s exists, skipped'%tor_addr)
+if __name__ == '__main__':
+    #0. init resources
+    g_name = 'rtd.ini'#stub
+    g_dryrun = False
+    rconf = rss_conf(g_name)
+    rdb = rss_db(rconf.dbname)
+    logging.basicConfig(filename=g_logname, level=logging.DEBUG, encoding="UTF-8")
+    
+    #1. init db
+    debug_out('Init db...')
+    for web in rconf.webs:
+        if rdb.is_table_exist(web.name):
             continue
-        if g_dryrun:
-            print "Download torrent from address %s"%tor_addr
-            continue
-        tor_name = os.path.join(rweb.temp_download_dir, g_tmp_tname)
-        debug_out('Begin to download torrent, address %s, path %s'%\
-                    (tor_addr, tor_name))
-        tor = download_torrent(tor_addr, tor_name)
-        if not tor:
-            #if failed to download the torrent, save to db and try to download it later
-            log_out('failed to download torrent from address %s' % tor_addr)
-            save_undown_torrent(tor, rdb)
-            continue
-        if rdb.is_sha_exist(tor.file_sha1):
-            log_out('Duplicate torrent downloaded, addr[%s], name[%s]' \
-                    % (tor.address, tor.file_name))
-            continue 
-        save_torrent(rweb, tor, rdb)
-        log_out('Download torrent[%s], from web[%s], address[%s]'\
-               % (tor.file_name, rweb.name, tor.address))
-
-#3. release all resources
-rdb.close()
+        rdb.create_table(web.name)
+    
+    #2. download the torrents which failed to downloaded last time
+    download_torrents_failed_last(rdb)
+    
+    #3. read in rss and download torrents
+    for rweb in rconf.webs:
+        debug_out('Get torrents info from %s'%rweb.address)
+        addrs = get_all_addrs(rweb.address)
+        for tor_addr in addrs:
+            if rdb.is_addr_exist(tor_addr, rweb.name):
+                debug_out('Torrent address %s exists, skipped'%tor_addr)
+                continue
+            if g_dryrun:
+                print "Download torrent from address %s"%tor_addr
+                continue
+            tor_name = os.path.join(rweb.temp_download_dir, g_tmp_tname)
+            debug_out('Begin to download torrent, address %s, path %s'%\
+                        (tor_addr, tor_name))
+            tor = download_torrent(tor_addr, tor_name)
+            if not tor:
+                #if failed to download the torrent, save to db and try to download it later
+                log_out('failed to download torrent from address %s' % tor_addr)
+                save_undown_torrent(tor, rdb)
+                continue
+            if rdb.is_sha_exist(tor.file_sha1):
+                log_out('Duplicate torrent downloaded, addr[%s], name[%s]' \
+                        % (tor.address, tor.file_name))
+                continue 
+            save_torrent(rweb, tor, rdb)
+            log_out('Download torrent[%s], from web[%s], address[%s]'\
+                   % (tor.file_name, rweb.name, tor.address))
+    
+    #4. release all resources
+    rdb.close()
