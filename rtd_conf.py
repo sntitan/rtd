@@ -53,7 +53,7 @@ class rss_conf(object):
         self.read_in_conf(conf_name)
 
 if __name__ == '__main__':
-    fname = 'test.ini'
+    fname = 'test.cfg'
     print 'Begin ut test...'
     rc = rss_conf(fname)
 
