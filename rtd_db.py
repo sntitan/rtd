@@ -1,6 +1,13 @@
 #!/usr/bin/python
 # coding=utf-8
 import sqlite3
+'''
+TODO LIST
+===
+1. 将torrent类扩充，接受buffer作为参数，如果传入了buffer，则解析出文件名、sha1
+2. torrent类添加获取标准种子名的方法，格式为 [网站名] 种子名.torrent
+3. 修改add_tor方法，支持写入down_count次数
+'''
 
 torrents_table_name='torrents'
 

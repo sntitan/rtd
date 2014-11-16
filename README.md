@@ -8,6 +8,7 @@ rss torrents downloader -- 用于下载使用rss发布的种子
 于是一年前，我写了rtd这个工具，当时是第一次使用python写脚本，写的不太好，最近我的python技能有了些长进，所以最近我准备重写一个。。
 
 ---
+
 ##使用方法
 ###1.配置文件
 默认的配置文件名为rtd.ini。在test.cfg中，有我的测试用例使用的配置文件，可以按照这个配置文件，编写自己的rtd.ini
@@ -25,9 +26,9 @@ python rtd.py
 ###3.副作用
 执行rtd.py之后，会在本目录生成文件：
 
-1.rtd.db：
+1. rtd.db：
 rtd.db是一个sqlite数据库，这里面保存着下载过的种子，再次读取rss内容时，rtd将根据这个数据库里面的数据判断一个种子是否已经下载过
 
-2.rtd.log:
+2. rtd.log:
 保存着执行中的日志，目前分为debug和info两个等级，两个等级都会记录在rtd.log中
 

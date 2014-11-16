@@ -8,6 +8,13 @@ import feedparser
 import urllib
 from bencode import bdecode
 import logging
+'''
+TODO LIST
+===
+1. 修改下载流程，下载失败时，写入数据库，down_count为0
+2. 读取rss网站之前，首先读取数据库中down_count为0的文件，尝试下载
+3. 定时检查download目录是否有新文件出现，如果有新文件出现则更新到数据库中
+'''
 
 g_tmp_tname = 'torrent.tmp'
 g_logname = 'rtd.log'
