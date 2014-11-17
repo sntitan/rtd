@@ -18,22 +18,31 @@ class rdbError(Exception):
         return self.value
 
 class torrent(object):
-    def __init__(self, filename=None, address=None, webname=None):
+    def __init__(self, address=None, webname=None):
         self.web_name = webname
         self.address = address
-        self.file_name = filename
+        self.tor_name = None
+        self.file_name = None
         self.file_down_count = 0
         self.file_sha1 = None
         self.add_time = None
+    def get_std_name(self):
+        if not self.file_name:
+            assert self.tor_name
+            assert self.web_name
+            self.file_name = '[%s] %s.torrent' % (self.web_name, self.tor.name)
+        return tor.file_name
 
 class rss_db(object):
     def open(self, db_name):
         self.db = sqlite3.connect(db_name)
         self.db.text_factory = str
+        if not self.is_table_exist(torrents_table_name):
+            self.create_torrents_table()
     def close(self):
         self.db.close()
     def __init__(self, db_name):
-        return self.open(db_name)
+        self.open(db_name)
     def __del__(self):
         return self.close()
     def create_torrents_table(self):
@@ -76,24 +85,19 @@ class rss_db(object):
         tors = self.is_exist('sha1', sha1)
         if not tors:
             return False
-        if len(tors) > 1:
-            raise rdbError('Multiple sha1 %s in talbe' % sha1)
         return True
     def add_tor(self, tor):
-        if self.is_sha_exist(tor.file_sha1):
-            raise rdbError('Torrent[%s] sha1[%s] is exists'\
-                          %(tor.file_name, tor.file_sha1))
         if tor.address:
             if self.is_addr_exist(tor.address):
                 raise rdbError('Torrent[%s] address[%s] is exists'\
                               %(tor.file_name, tor.address))
-            self.db.execute("INSERT INTO %s(web_name, address, file_name, sha1) \
-                            VALUES (?,?,?,?)" % torrents_table_name, 
-                            (tor.web_name, tor.address, tor.file_name, tor.file_sha1))
+            self.db.execute("INSERT INTO %s(web_name, address, file_name, file_down_count, sha1) \
+                VALUES (?,?,?,?,?)" % torrents_table_name, 
+                (tor.web_name, tor.address, tor.file_name, tor.file_down_count, tor.file_sha1))
         else:
-            self.db.execute("INSERT INTO %s(web_name, file_name, sha1) \
-                            VALUES (?,?,?)" % torrents_table_name, 
-                            (tor.web_name, tor.file_name, tor.file_sha1))
+            self.db.execute("INSERT INTO %s(web_name, file_name, file_down_count, sha1) \
+                            VALUES (?,?,?,?)" % torrents_table_name, 
+                            (tor.web_name, tor.file_name, tor.file_down_count, tor.file_sha1))
         self.db.commit()
 
     def update_addr_by_sha(self, tor):
@@ -117,7 +121,6 @@ if __name__ == '__main__':
     ccnt = 0
     #case1
     ccnt+=1
-    rd.create_torrents_table()
     assert rd.is_table_exist(torrents_table_name)
     assert rd.is_table_exist('SN3') == False
 
