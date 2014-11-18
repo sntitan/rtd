@@ -10,6 +10,7 @@ TODO LIST
 '''
 
 torrents_table_name='torrents'
+webpage_table_name='webpage'
 
 class rdbError(Exception):
     def __init__(self, errstr):
@@ -33,12 +34,19 @@ class torrent(object):
             self.file_name = '[%s] %s.torrent' % (self.web_name, self.tor.name)
         return tor.file_name
 
+class webpage(object):
+    def __init__(self, address, webname):
+        self.web_name = webname
+        self.address = address
+
 class rss_db(object):
     def open(self, db_name):
         self.db = sqlite3.connect(db_name)
         self.db.text_factory = str
         if not self.is_table_exist(torrents_table_name):
             self.create_torrents_table()
+        if not self.is_table_exist(webpage_table_name):
+            self.create_webpage_table()
     def close(self):
         self.db.close()
     def __init__(self, db_name):
@@ -55,7 +63,11 @@ class rss_db(object):
                         file_down_count INTERGER DEFAULT 1, \
                         sha1 TEXT NOT NULL, \
                         add_time DATETIME);" % torrents_table_name)
-
+    def create_webpage_table(self):
+        if self.is_table_exist(webpage_table_name):
+            raise rdbError('Table %s is exists'%webpage_table_name)
+        self.db.execute("CREATE TABLE IF NOT EXISTS %s \
+                        (web_name TEXT, address TEXT NOT NULL);" % webpage_table_name)
     def is_table_exist(self, name):
         sor = self.db.cursor()
         tb_list = sor.execute("SELECT name FROM sqlite_master \
@@ -64,31 +76,43 @@ class rss_db(object):
             if tname[0] == name:
                 return True
         return False
-    def is_exist(self, key, value):
+    def is_exist(self, table_name, key, value):
         sor = self.db.cursor()
-        sor.execute("SELECT * FROM %s WHERE %s=?" % (torrents_table_name, key), 
+        sor.execute("SELECT * FROM %s WHERE %s=?" % (table_name, key), 
                     (value,))
         all_found = sor.fetchall()
         if len(all_found) == 0:
             return None
         return all_found
-    def is_addr_exist(self, addr):
-        assert addr
-        tors = self.is_exist('address', addr)
+    def is_exist_single(self, table_name, key, value):
+        assert key
+        assert value
+        tors = self.is_exist(table_name, key, value)
         if not tors:
             return False
         if len(tors) > 1:
-            raise rdbError('Multiple addr %s in talbe' % addr)
+            raise rdbError('Multiple key/value %s/%s in talbe' % (key,value))
         return True
+    def is_toraddr_exist(self, addr):
+        return self.is_exist_single(torrents_table_name, 'address', addr)
+    def is_webaddr_exist(self, addr):
+        return self.is_exist_single(webpage_table_name, 'address', addr)
+    def is_addr_exist(self, addr):
+        if self.is_toraddr_exist(addr):
+            return True
+        if self.is_webaddr_exist(addr):
+            return True
+        return False
     def is_sha_exist(self, sha1):
         assert sha1
-        tors = self.is_exist('sha1', sha1)
+        tors = self.is_exist(torrents_table_name, 'sha1', sha1)
         if not tors:
             return False
         return True
+
     def add_tor(self, tor):
         if tor.address:
-            if self.is_addr_exist(tor.address):
+            if self.is_toraddr_exist(tor.address):
                 raise rdbError('Torrent[%s] address[%s] is exists'\
                               %(tor.file_name, tor.address))
             self.db.execute("INSERT INTO %s(web_name, address, file_name, file_down_count, sha1) \
@@ -99,14 +123,20 @@ class rss_db(object):
                             VALUES (?,?,?,?)" % torrents_table_name, 
                             (tor.web_name, tor.file_name, tor.file_down_count, tor.file_sha1))
         self.db.commit()
-
-    def update_addr_by_sha(self, tor):
+    def update_toraddr_by_sha(self, tor):
         if not self.is_table_exist(torrents_table_name):
             raise rdbError('Table %s is exists'%torrents_table_name)
         if not self.is_sha_exist(tor.file_sha1):
             raise rdbError("Torrent's sha1[%s] is not exists" % tor.file_sha1)
         self.db.execute("UPDATE %s SET address=? WHERE sha1=?"%torrents_table_name,\
                         (tor.address, tor.file_sha1))
+        self.db.commit()
+
+    def add_webpage(self, web):
+        if self.is_webaddr_exist(web.address):
+            raise rdbError('webpage address[%s] is exists'%web.address)
+        self.db.execute("INSERT INTO %s(web_name, address) VALUES (?,?)"%webpage_table_name,\
+                        (web.web_name, web.address))
         self.db.commit()
 
 if __name__ == '__main__':
@@ -150,12 +180,16 @@ if __name__ == '__main__':
         pass
     else:
         assert False
+    assert rd.is_toraddr_exist('address_torrent2')
     assert rd.is_addr_exist('address_torrent2')
+    assert rd.is_webaddr_exist('address_torrent2') == False
     assert rd.is_sha_exist('abcdefgt2')
 
     #case4
     ccnt+=1
+    assert rd.is_toraddr_exist('address_torrent3') == False
     assert rd.is_addr_exist('address_torrent3') == False
+    assert rd.is_webaddr_exist('address_torrent3') == False
     assert rd.is_sha_exist('abcdadfasdfsadfasfasdf') == False
 
     #case5
@@ -171,6 +205,7 @@ if __name__ == '__main__':
     rd.add_tor(t3)
 
     #case6
+    ccnt+=1
     t4 = torrent()
     t4.web_name = 'SN3'
     t4.address = 'address_torrent4_before'
@@ -178,16 +213,17 @@ if __name__ == '__main__':
     t4.file_sha1 = 'abcdefgt4'
     rd.add_tor(t4)
     assert rd.is_sha_exist('abcdefgt4')
-    assert rd.is_addr_exist('address_torrent4_before')
-    assert rd.is_addr_exist('address_torrent4_after') == False
+    assert rd.is_toraddr_exist('address_torrent4_before')
+    assert rd.is_toraddr_exist('address_torrent4_after') == False
     t4.address = 'address_torrent4_after'
-    rd.update_addr_by_sha(t4)
-    assert rd.is_addr_exist('address_torrent4_before') == False
-    assert rd.is_addr_exist('address_torrent4_after')
+    rd.update_toraddr_by_sha(t4)
+    assert rd.is_toraddr_exist('address_torrent4_before') == False
+    assert rd.is_toraddr_exist('address_torrent4_after')
 
     #case7
+    ccnt+=1
     try:
-        rd.is_addr_exist(None)
+        rd.is_toraddr_exist(None)
     except AssertionError:
         pass
     else:
@@ -198,6 +234,15 @@ if __name__ == '__main__':
         pass
     else:
         assert False
+
+    #case8
+    ccnt+=1
+    wp = webpage('webpage_address1', 'SN1')
+    rd.add_webpage(wp)
+    assert rd.is_webaddr_exist('webpage_address1')
+    assert rd.is_addr_exist('webpage_address1')
+    assert rd.is_toraddr_exist('webpage_address1') == False
+    
 
     print 'All test finished, total num %u' % ccnt
     rd.close()

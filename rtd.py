@@ -85,6 +85,9 @@ def get_all_addrs(web_addr):
             down_links.append(addr_info['href'])
     return down_links
 
+def is_download_link(addr):
+    return True
+
 if __name__ == '__main__':
     #0. init resources
     g_name = 'rtd.ini'#stub
@@ -104,7 +107,10 @@ if __name__ == '__main__':
         debug_out('Get torrents info from %s'%rweb.address)
         addrs = get_all_addrs(rweb.address)
         for tor_addr in addrs:
-            if rdb.is_addr_exist(tor_addr):
+            if not is_download_link(tor_addr):
+                debug_out('Not download link, addr %s'%tor_addr)
+                continue
+            if rdb.is_toraddr_exist(tor_addr):
                 debug_out('Torrent address %s exists, skipped'%tor_addr)
                 continue
             if g_dryrun:
