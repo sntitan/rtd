@@ -17,7 +17,7 @@ TODO LIST
 '''
 
 g_tmp_tname = 'torrent.tmp'
-g_logname = 'rtd.log'
+g_logname = 'logfile/rtd.log'
 
 def log_out(msg):
     logging.info(msg)
@@ -91,7 +91,10 @@ if __name__ == '__main__':
     g_dryrun = False
     rconf = rss_conf(g_name)
     rdb = rss_db(rconf.dbname)
-    logging.basicConfig(filename=g_logname, level=logging.DEBUG, encoding="UTF-8")
+    logging.basicConfig(filename=g_logname, 
+                        level=logging.DEBUG, 
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        encoding="UTF-8")
     
     #1. download the torrents which failed to downloaded last time
     download_torrents_failed_last(rdb)
