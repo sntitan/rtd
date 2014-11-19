@@ -5,8 +5,6 @@ import sqlite3
 TODO LIST
 ===
 1. 将torrent类扩充，接受buffer作为参数，如果传入了buffer，则解析出文件名、sha1
-2. torrent类添加获取标准种子名的方法，格式为 [网站名] 种子名.torrent
-3. 修改add_tor方法，支持写入down_count次数
 '''
 
 torrents_table_name='torrents'
@@ -123,13 +121,27 @@ class rss_db(object):
                             VALUES (?,?,?,?)" % torrents_table_name, 
                             (tor.web_name, tor.file_name, tor.file_down_count, tor.file_sha1))
         self.db.commit()
-    def update_toraddr_by_sha(self, tor):
+
+    def set_toraddr_by_sha(self, tor):
         if not self.is_table_exist(torrents_table_name):
             raise rdbError('Table %s is exists'%torrents_table_name)
         if not self.is_sha_exist(tor.file_sha1):
             raise rdbError("Torrent's sha1[%s] is not exists" % tor.file_sha1)
         self.db.execute("UPDATE %s SET address=? WHERE sha1=?"%torrents_table_name,\
                         (tor.address, tor.file_sha1))
+        self.db.commit()
+
+    def get_downcnt0_list(self):
+        sor = self.db.cursor()
+        sor.execute("SELECT address FROM %s WHERE file_down_count=0" % torrents_table_name)
+        addr_list_db = sor.fetchall()
+        addr_list = []
+        for addr_db in addr_list_db:
+            addr_list.append(addr_db[0])
+        return addr_list
+    def set_downcnt(self, addr, downcnt):
+        self.db.execute("UPDATE %s SET file_down_count=? WHERE address=?"%\
+                        torrents_table_name, (downcnt, addr))
         self.db.commit()
 
     def add_webpage(self, web):
@@ -211,12 +223,13 @@ if __name__ == '__main__':
     t4.address = 'address_torrent4_before'
     t4.file_name = 'name_t4'
     t4.file_sha1 = 'abcdefgt4'
+    t4.file_down_count = 1
     rd.add_tor(t4)
     assert rd.is_sha_exist('abcdefgt4')
     assert rd.is_toraddr_exist('address_torrent4_before')
     assert rd.is_toraddr_exist('address_torrent4_after') == False
     t4.address = 'address_torrent4_after'
-    rd.update_toraddr_by_sha(t4)
+    rd.set_toraddr_by_sha(t4)
     assert rd.is_toraddr_exist('address_torrent4_before') == False
     assert rd.is_toraddr_exist('address_torrent4_after')
 
@@ -243,6 +256,30 @@ if __name__ == '__main__':
     assert rd.is_addr_exist('webpage_address1')
     assert rd.is_toraddr_exist('webpage_address1') == False
     
+    #case9
+    ccnt+=1
+    t5 = torrent()
+    t5.web_name = 'SN3'
+    t5.address = 'address_torrent5_before'
+    t5.file_name = 'name_t5'
+    t5.file_sha1 = 'abcdefgt5'
+    t5.file_down_count = 0
+    rd.add_tor(t5)
+    t6 = torrent()
+    t6.web_name = 'SN3'
+    t6.address = 'address_torrent6_before'
+    t6.file_name = 'name_t6'
+    t6.file_sha1 = 'abcdefgt6'
+    t6.file_down_count = 0
+    rd.add_tor(t6)
+    addr_list = rd.get_downcnt0_list()
+    assert len(addr_list) == 2
+    assert addr_list[0] == 'address_torrent5_before'
+    assert addr_list[1] == 'address_torrent6_before'
+    rd.set_downcnt(addr_list[0], 1)
+    rd.set_downcnt(addr_list[1], 2)
+    addr_list = rd.get_downcnt0_list()
+    assert len(addr_list) == 0
 
     print 'All test finished, total num %u' % ccnt
     rd.close()
