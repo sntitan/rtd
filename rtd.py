@@ -121,7 +121,7 @@ if __name__ == '__main__':
         for tor_addr in addrs:
             #如果地址不是下载地址，则直接跳过，首先从数据库中查找，如果数据库中没有，再通过HEAD请求判断
             if rdb.is_webaddr_exist(tor_addr):
-                debug_out('Not download link, addr %s'%tor_addr)
+                debug_out('Not download link by db, addr %s'%tor_addr)
                 continue
             if not is_download_link(tor_addr):
                 debug_out('Not download link, addr %s'%tor_addr)
