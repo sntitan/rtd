@@ -6,8 +6,10 @@ import os
 import hashlib
 import feedparser
 import urllib
+import urllib2
 from bencode import bdecode
 import logging
+import re
 '''
 TODO LIST
 ===
@@ -86,12 +88,22 @@ def get_all_addrs(web_addr):
     return down_links
 
 def is_download_link(addr):
+    conn = urllib2.urlopen(addr)
+    cinfo = conn.info()
+    conn.close()
+    if not cinfo.has_key('content-type'):
+        return False
+    if cinfo['content-type'] == 'application/x-bittorrent':
+        return True
+    if not re.compile('torrent').search(cinfo['content-type']):
+        return False
+    log_out('Unknown content-type(%s) but i guess it is a torrent addr' % \
+            cinfo['content-type'])
     return True
 
 if __name__ == '__main__':
     #0. init resources
     g_name = 'rtd.ini'#stub
-    g_dryrun = False
     rconf = rss_conf(g_name)
     rdb = rss_db(rconf.dbname)
     logging.basicConfig(filename=g_logname, 
@@ -107,14 +119,17 @@ if __name__ == '__main__':
         debug_out('Get torrents info from %s'%rweb.address)
         addrs = get_all_addrs(rweb.address)
         for tor_addr in addrs:
-            if not is_download_link(tor_addr):
+            #如果地址不是下载地址，则直接跳过，首先从数据库中查找，如果数据库中没有，再通过HEAD请求判断
+            if rdb.is_webaddr_exist(tor_addr):
                 debug_out('Not download link, addr %s'%tor_addr)
                 continue
+            if not is_download_link(tor_addr):
+                debug_out('Not download link, addr %s'%tor_addr)
+                rdb.add_webpage(webpage(tor_addr, rweb.name));
+                continue
+            #首先判断数据库中是否保存了种子地址，如果没保存，则开始下载
             if rdb.is_toraddr_exist(tor_addr):
                 debug_out('Torrent address %s exists, skipped'%tor_addr)
-                continue
-            if g_dryrun:
-                print "Download torrent from address %s"%tor_addr
                 continue
             tor_name = os.path.join(rweb.temp_download_dir, g_tmp_tname)
             debug_out('Begin to download torrent, address %s, path %s'%\
@@ -125,12 +140,15 @@ if __name__ == '__main__':
                 log_out('failed to download torrent from address %s' % tor_addr)
                 save_undown_torrent(tor, rdb)
                 continue
+            #下载完成后，应该立即写入数据库。
+            #如果没有立即写入，后续的操作可能会continue，漏掉写入流程，
+            #最终导致每次连接rss都会重复下载种子
             rdb.add_tor(tor)
             if rdb.is_sha_exist(tor.file_sha1):
                 log_out('Duplicate torrent downloaded, addr[%s], name[%s]' \
                         % (tor.address, tor.file_name))
                 continue 
-            mv_torrent(rweb, tor, rdb)
+            mv_torrent(rweb, tor)
             log_out('Download torrent[%s], from web[%s], address[%s]'\
                    % (tor.file_name, rweb.name, tor.address))
     
